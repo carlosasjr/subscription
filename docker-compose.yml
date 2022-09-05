@@ -1,0 +1,90 @@
+version: "3.7"
+
+services:
+  # image project
+  assinatura:
+    container_name: assinatura
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: especializati/laravel9-app
+    restart: unless-stopped
+    working_dir: /var/www/
+    volumes:
+      - ./:/var/www
+    depends_on:
+      - redis
+    networks:
+      - api-assinatura
+
+  # nginx
+  nginx:
+    container_name: assinatura-nginx
+    image: nginx:alpine
+    restart: unless-stopped
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www
+      - ./docker/nginx/:/etc/nginx/conf.d/
+    networks:
+      - api-assinatura
+
+  # db mysql
+  mysql:
+    container_name: assinatura-mysql
+    image: mysql:5.7.22
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_USER: ${DB_USERNAME}
+    volumes:
+      - ./.docker/mysql/dbdata:/var/lib/mysql
+    ports:
+      - "3388:3306"
+    networks:
+      - api-assinatura
+
+  phpmyadmin:
+    container_name: assinatura-phpmyadmin
+    image: phpmyadmin/phpmyadmin:latest
+    restart: always
+    ports:
+      - 8081:80
+    links:
+      - mysql
+    environment:
+      - PMA_ARBITRARY=1
+    networks:
+      - api-assinatura
+
+  # queue
+  queue:
+    container_name: assinatura-queue
+    image: especializati/laravel9-app
+    restart: unless-stopped
+    command: "php artisan queue:work"
+    volumes:
+      - ./:/var/www
+    depends_on:
+      - redis
+      - assinatura
+    networks:
+      - api-assinatura
+
+  # redis
+  redis:
+    container_name: assinatura-redis
+    image: redis:latest
+    networks:
+      - api-assinatura
+
+
+networks:
+  api-assinatura:
+    driver: bridge
+
+volumes:
+  redis_data:
